@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and fill in your Oracle Cloud values.
+# Get these from: Oracle Cloud Console > Identity > Users > Your user > API Keys
+#
+# DO NOT COMMIT terraform.tfvars - it's in .gitignore.
+
+tenancy_ocid     = "ocid1.tenancy.oc1..xxxxx"
+user_ocid        = "ocid1.user.oc1..xxxxx"
+fingerprint      = "aa:bb:cc:dd:..."
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "me-jeddah-1"
+compartment_ocid = "ocid1.tenancy.oc1..xxxxx"   # root compartment OCID is same as tenancy
+
+ssh_public_key_path      = "~/.ssh/oracle_rwtd.pub"
+allowed_ssh_cidr         = "0.0.0.0/0"  # tighten to YOUR_IP/32 once working
+allowed_healthcheck_cidr = "0.0.0.0/0"
+
+# Once you know which AD has capacity, pin it here to avoid duplicate VMs:
+# target_ad = "XyZa:ME-JEDDAH-1-AD-1"
+target_ad    = ""
+git_repo_url = "https://github.com/YOUR-USERNAME/rwtd-cloud-bot.git"

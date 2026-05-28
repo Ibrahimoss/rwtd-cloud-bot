@@ -1,0 +1,48 @@
+# Local + cloud both use this same compose file.
+# Override per-environment with docker-compose.override.yml if needed.
+
+services:
+  android:
+    # ARM image for Oracle Ampere. For local x86 dev, swap to redroid/redroid:12.0.0-latest
+    image: redroid/redroid:12.0.0_64only-latest
+    container_name: rwtd-android
+    privileged: true
+    restart: unless-stopped
+    ports:
+      - "5555:5555"          # ADB. Keep this firewalled in cloud.
+    volumes:
+      - ./android-data:/data
+    command:
+      - androidboot.redroid_width=${ANDROID_WIDTH:-720}
+      - androidboot.redroid_height=${ANDROID_HEIGHT:-1280}
+      - androidboot.redroid_dpi=${ANDROID_DPI:-320}
+      - androidboot.redroid_fps=${ANDROID_FPS:-30}
+      - androidboot.redroid_gpu_mode=guest
+    networks:
+      - botnet
+
+  bot:
+    build:
+      context: ..
+      dockerfile: docker/bot/Dockerfile
+    container_name: rwtd-bot
+    restart: unless-stopped
+    depends_on:
+      - android
+    env_file:
+      - ../.env
+    environment:
+      - ADB_HOST=android
+      - ADB_PORT=5555
+    volumes:
+      - ../bot:/app/bot
+      - ../logs:/app/logs
+      - ../screenshots:/app/screenshots
+    ports:
+      - "8080:8080"          # Healthcheck endpoint
+    networks:
+      - botnet
+
+networks:
+  botnet:
+    driver: bridge

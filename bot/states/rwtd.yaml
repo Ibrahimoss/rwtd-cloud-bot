@@ -1,0 +1,64 @@
+# Reference state machine for Rogue with the Dead: Idle RPG.
+#
+# This is a STUB. Templates referenced here don't exist yet — you need to
+# capture them yourself once the game is running (see scripts/capture_template.py).
+#
+# State machine logic for easy-mode grinding (placeholder):
+#   1. If on main menu, start a run
+#   2. While running, periodically tap to upgrade units / collect gold
+#   3. On death/victory, claim rewards and restart
+#
+# Adjust to match the actual UI flow once you've played the game manually.
+
+initial_state: unknown
+
+states:
+
+  main_menu:
+    detect: ../templates/main_menu_anchor.png
+    actions:
+      - log: "On main menu - starting run"
+      - tap: [360, 1100]      # placeholder coordinates - replace after capture
+      - wait: 2
+    transitions:
+      - if_visible: ../templates/in_run.png
+        to: in_run
+
+  in_run:
+    detect: ../templates/in_run.png
+    actions:
+      - log: "In run - tapping upgrade"
+      - tap: [600, 1800]      # placeholder - upgrade button
+      - wait: 5
+    transitions:
+      - if_visible: ../templates/death_screen.png
+        to: death
+      - if_visible: ../templates/victory_screen.png
+        to: victory
+
+  death:
+    detect: ../templates/death_screen.png
+    actions:
+      - log: "Died - restarting"
+      - tap: [360, 1700]      # placeholder - continue button
+      - wait: 3
+    transitions:
+      - if_visible: ../templates/main_menu_anchor.png
+        to: main_menu
+
+  victory:
+    detect: ../templates/victory_screen.png
+    actions:
+      - log: "Victory - claiming"
+      - tap: [360, 1700]
+      - wait: 3
+    transitions:
+      - if_visible: ../templates/main_menu_anchor.png
+        to: main_menu
+
+  unknown:
+    detect: ../templates/main_menu_anchor.png   # falls through to recovery
+    actions:
+      - log: "Unknown state - waiting"
+      - wait: 5
+    transitions: []

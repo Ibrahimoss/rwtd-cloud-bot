@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+
+# Logs and runtime data
+logs/
+screenshots/
+*.log
+
+# Docker / Android persistent data
+android-data/
+docker/android-data/
+docker/docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfplan
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+*.pem
+*.key
+oci_api_key*
+
+# AI assistant context (local only)
+CLAUDE.md
