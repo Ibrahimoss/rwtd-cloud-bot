@@ -108,6 +108,23 @@ locals {
     #!/usr/bin/env bash
     set -euxo pipefail
 
+    # --- Kernel diagnostics: persistent journal + panic on hang ---
+    # Without these, when redroid wedges the host we have to force-reboot blindly.
+    # With them: kernel logs survive reboot, and a hung kernel panics+reboots itself.
+    mkdir -p /var/log/journal
+    systemd-tmpfiles --create --prefix /var/log/journal
+    systemctl restart systemd-journald
+    # Panic on soft/hard lockups and oops, with a short hung-task timeout
+    cat > /etc/sysctl.d/99-redroid-debug.conf <<'SYSCTL'
+    kernel.panic = 10
+    kernel.panic_on_oops = 1
+    kernel.hardlockup_panic = 1
+    kernel.softlockup_panic = 1
+    kernel.hung_task_timeout_secs = 60
+    kernel.hung_task_panic = 1
+    SYSCTL
+    sysctl -p /etc/sysctl.d/99-redroid-debug.conf || true
+
     # --- Install Docker from Docker's official APT repo ---
     # Ubuntu's docker.io package lacks the modern `docker compose` plugin,
     # and `docker-compose-plugin` only exists in Docker's repo, not Ubuntu's.
