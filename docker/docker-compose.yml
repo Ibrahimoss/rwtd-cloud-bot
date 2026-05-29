@@ -3,20 +3,23 @@
 
 services:
   android:
-    # ARM image for Oracle Ampere. For local x86 dev, swap to redroid/redroid:12.0.0-latest
-    image: redroid/redroid:12.0.0_64only-latest
+    # ARM image for Oracle Ampere. For local x86 dev, swap to redroid/redroid:11.0.0-latest
+    # Pinned to redroid 11 (more battle-tested on Ampere than 12).
+    image: redroid/redroid:11.0.0_64only-latest
     container_name: rwtd-android
     privileged: true
-    restart: unless-stopped
+    # NOTE: no `restart: unless-stopped` — first-boot of redroid has wedged Always
+    # Free ARM VMs. With no restart policy, a force-reboot via OCI breaks the cycle
+    # instead of re-wedging on next boot. Re-add restart policy once stable.
     ports:
       - "5555:5555"          # ADB. Keep this firewalled in cloud.
     volumes:
       - ./android-data:/data
     command:
-      - androidboot.redroid_width=${ANDROID_WIDTH:-720}
-      - androidboot.redroid_height=${ANDROID_HEIGHT:-1280}
-      - androidboot.redroid_dpi=${ANDROID_DPI:-320}
-      - androidboot.redroid_fps=${ANDROID_FPS:-30}
+      - androidboot.redroid_width=${ANDROID_WIDTH:-540}
+      - androidboot.redroid_height=${ANDROID_HEIGHT:-960}
+      - androidboot.redroid_dpi=${ANDROID_DPI:-240}
+      - androidboot.redroid_fps=${ANDROID_FPS:-15}
       - androidboot.redroid_gpu_mode=guest
     networks:
       - botnet
@@ -26,7 +29,7 @@ services:
       context: ..
       dockerfile: docker/bot/Dockerfile
     container_name: rwtd-bot
-    restart: unless-stopped
+    # No restart policy until the android service proves stable. See note above.
     depends_on:
       - android
     env_file:
