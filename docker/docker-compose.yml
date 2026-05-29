@@ -3,9 +3,14 @@
 
 services:
   android:
-    # ARM image for Oracle Ampere. For local x86 dev, swap to redroid/redroid:11.0.0-latest
-    # Pinned to redroid 11 (more battle-tested on Ampere than 12).
-    image: redroid/redroid:11.0.0-latest
+    # ARM image with Android 13 + LiteGapps + Magisk-Delta pre-installed.
+    # Required because:
+    # - Vanilla redroid has no Play Store. Reference game blocked by PAIRIP without it.
+    # - Magisk is needed to install Play Integrity Fix (Zygisk) module that spoofs the
+    #   device fingerprint, satisfying Google's emulator-detection.
+    # See feedback-red-line-carveout in memory for why this is OK here.
+    # Community image — review before using outside this project.
+    image: fahaddz/redroid:13-arm-pi5
     container_name: rwtd-android
     privileged: true
     # NOTE: no `restart: unless-stopped` — first-boot of redroid has wedged Always
