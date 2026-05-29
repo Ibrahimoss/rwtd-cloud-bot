@@ -55,26 +55,36 @@ Once it succeeds, note the `vm_public_ips` output.
 
 ## 6. Deploy
 
-Cloud-init handles **system setup** on first boot:
+Cloud-init handles **system setup** on first boot, then **reboots the VM**:
 
 1. Installs Docker (from Docker's official APT repo — Ubuntu's `docker.io` lacks `docker compose`)
-2. Loads redroid kernel modules (`binder_linux`, `ashmem_linux`)
-3. Clones the repo and copies `.env.example` to `.env`
-4. Sets up a keep-alive cron (every 30 min) to prevent Oracle from reclaiming the VM
+2. **Downgrades the kernel to 5.15-oracle** — Oracle's default 6.8-oracle has a binder driver bug that wedges the host as soon as redroid's `servicemanager` starts. 5.15 works and ships `ashmem_linux` which 6.8 does not.
+3. Configures `binder_linux` + `ashmem_linux` to auto-load on next boot
+4. Clones the repo and copies `.env.example` to `.env`
+5. Sets up a keep-alive cron (every 30 min) to prevent Oracle from reclaiming the VM
+6. Reboots into the 5.15 kernel
+
+The reboot is required — the kernel modules redroid needs only exist on 5.15. **Expect ~3-5 minutes total from `terraform apply` succeeding to SSH being available on the rebooted host.**
 
 Cloud-init logs: `ssh ubuntu@<VM_IP> 'sudo cat /var/log/cloud-init-output.log'`
+
+Verify after reboot:
+```bash
+ssh -i ~/.ssh/oracle_rwtd ubuntu@<VM_IP>
+uname -r                # should be 5.15.0-1002-oracle
+lsmod | grep -iE 'binder|ashmem'   # both should be loaded
+```
 
 Cloud-init does **NOT** auto-start the docker stack. SSH in and start it manually so you can watch logs:
 
 ```bash
-ssh -i ~/.ssh/oracle_rwtd ubuntu@<VM_IP>
 cd ~/rwtd-cloud-bot
 sudo docker compose -f docker/docker-compose.yml up   # foreground, watch logs
 # Ctrl+C, then:
 sudo docker compose -f docker/docker-compose.yml up -d # detach once stable
 ```
 
-This was a deliberate choice: redroid first-boot is heavy (kernel modules + Android init) and has wedged Always Free ARM VMs when run unattended via cloud-init. With manual start you can `Ctrl+C` if the VM gets sick.
+This was a deliberate choice: redroid first-boot is heavy and has wedged Always Free ARM VMs when run unattended via cloud-init. With manual start you can `Ctrl+C` if the VM gets sick.
 
 ## 7. First-time game install
 

@@ -108,22 +108,19 @@ locals {
     #!/usr/bin/env bash
     set -euxo pipefail
 
-    # --- Kernel diagnostics: persistent journal + panic on hang ---
-    # Without these, when redroid wedges the host we have to force-reboot blindly.
-    # With them: kernel logs survive reboot, and a hung kernel panics+reboots itself.
+    # --- Wait for Ubuntu's first-boot unattended-upgrades to release apt ---
+    # Cloud-init races with Ubuntu's automatic background apt; lose that race
+    # and the entire script fails on a lock error.
+    for i in $(seq 1 60); do
+      sudo fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock 2>/dev/null || break
+      echo "waiting for apt lock... ($i/60)"
+      sleep 5
+    done
+
+    # --- Persistent journal so kernel logs survive an unplanned reboot ---
     mkdir -p /var/log/journal
     systemd-tmpfiles --create --prefix /var/log/journal
     systemctl restart systemd-journald
-    # Panic on soft/hard lockups and oops, with a short hung-task timeout
-    cat > /etc/sysctl.d/99-redroid-debug.conf <<'SYSCTL'
-    kernel.panic = 10
-    kernel.panic_on_oops = 1
-    kernel.hardlockup_panic = 1
-    kernel.softlockup_panic = 1
-    kernel.hung_task_timeout_secs = 60
-    kernel.hung_task_panic = 1
-    SYSCTL
-    sysctl -p /etc/sysctl.d/99-redroid-debug.conf || true
 
     # --- Install Docker from Docker's official APT repo ---
     # Ubuntu's docker.io package lacks the modern `docker compose` plugin,
@@ -139,11 +136,22 @@ locals {
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-    # --- Kernel modules for redroid ---
-    apt-get install -y linux-modules-extra-$(uname -r) || true
-    modprobe binder_linux devices="binder,hwbinder,vndbinder" || true
-    modprobe ashmem_linux || true
+    # --- Kernel downgrade to 5.15 for redroid ---
+    # Oracle's default 6.8-oracle kernel has a binder driver bug that wedges
+    # the VM as soon as redroid's servicemanager runs. 5.15 works and ships
+    # ashmem_linux which 6.8 does not.
+    apt-get install -y \
+      linux-image-5.15.0-1002-oracle \
+      linux-modules-5.15.0-1002-oracle \
+      linux-modules-extra-5.15.0-1002-oracle
+    # Override grub default (the zzz- prefix loads after Oracle's init-select.cfg)
+    echo 'GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 5.15.0-1002-oracle"' \
+      > /etc/default/grub.d/zzz-pin-515.cfg
+    update-grub
 
+    # --- Configure redroid kernel modules to auto-load on next boot ---
+    # modprobe here would fail (binder/ashmem layouts differ between 6.8 and 5.15),
+    # so we just write the modules-load config and let systemd handle it after reboot.
     echo binder_linux > /etc/modules-load.d/redroid.conf
     echo ashmem_linux >> /etc/modules-load.d/redroid.conf
     echo 'options binder_linux devices=binder,hwbinder,vndbinder' > /etc/modprobe.d/redroid.conf
@@ -163,10 +171,12 @@ locals {
     echo "*/30 * * * * /usr/bin/head -c 1M /dev/zero | /usr/bin/md5sum > /dev/null" \
       | crontab -u ubuntu -
 
-    # --- NOTE: We intentionally do NOT auto-start the docker stack. ---
-    # First-boot of redroid + kernel modules has wedged VMs in the past.
-    # SSH in and run `cd ~/rwtd-cloud-bot && docker compose -f docker/docker-compose.yml up -d`
+    # --- Reboot into the 5.15 kernel ---
+    # We do NOT auto-start the docker stack. After reboot, the user SSHs in
+    # and runs `cd ~/rwtd-cloud-bot && sudo docker compose -f docker/docker-compose.yml up -d`
     # with eyes on the logs. See docs/oracle-setup.md.
+    echo "=== Cloud-init finished. Rebooting into 5.15-oracle kernel. ==="
+    nohup sh -c 'sleep 5 && reboot' >/dev/null 2>&1 &
   CLOUD_INIT
 }
 
