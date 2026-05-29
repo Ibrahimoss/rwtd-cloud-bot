@@ -18,7 +18,10 @@ def connect_device(host: str, port: int, max_retries: int = 60, delay: float = 5
     redroid takes 30-90 seconds to boot the first time, longer on slow VMs.
     Retry with a generous timeout instead of failing fast.
     """
-    uri = f"Android://{host}:{port}/{host}:{port}"
+    # Airtest URI: Android://[adbhost]/<serial>
+    # Empty adbhost means "use the local adb server in this container".
+    # Serial is host:port — Airtest runs `adb connect host:port` for us.
+    uri = f"Android:///{host}:{port}"
     for attempt in range(1, max_retries + 1):
         try:
             dev: Android = airtest_connect(uri)
