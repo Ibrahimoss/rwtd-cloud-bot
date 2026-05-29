@@ -5,7 +5,7 @@ services:
   android:
     # ARM image for Oracle Ampere. For local x86 dev, swap to redroid/redroid:11.0.0-latest
     # Pinned to redroid 11 (more battle-tested on Ampere than 12).
-    image: redroid/redroid:11.0.0_64only-latest
+    image: redroid/redroid:11.0.0-latest
     container_name: rwtd-android
     privileged: true
     # NOTE: no `restart: unless-stopped` — first-boot of redroid has wedged Always
