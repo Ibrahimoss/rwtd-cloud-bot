@@ -53,18 +53,28 @@ terraform apply
 
 Once it succeeds, note the `vm_public_ips` output.
 
-## 6. Deploy (automatic via cloud-init)
+## 6. Deploy
 
-The VM now self-provisions via **cloud-init** — no manual SSH deploy step needed. On first boot it:
+Cloud-init handles **system setup** on first boot:
 
-1. Installs Docker and git
+1. Installs Docker (from Docker's official APT repo — Ubuntu's `docker.io` lacks `docker compose`)
 2. Loads redroid kernel modules (`binder_linux`, `ashmem_linux`)
-3. Clones the repo and runs `docker compose up`
+3. Clones the repo and copies `.env.example` to `.env`
 4. Sets up a keep-alive cron (every 30 min) to prevent Oracle from reclaiming the VM
 
 Cloud-init logs: `ssh ubuntu@<VM_IP> 'sudo cat /var/log/cloud-init-output.log'`
 
-If you prefer manual deployment, `scripts/deploy.sh` still works as before.
+Cloud-init does **NOT** auto-start the docker stack. SSH in and start it manually so you can watch logs:
+
+```bash
+ssh -i ~/.ssh/oracle_rwtd ubuntu@<VM_IP>
+cd ~/rwtd-cloud-bot
+sudo docker compose -f docker/docker-compose.yml up   # foreground, watch logs
+# Ctrl+C, then:
+sudo docker compose -f docker/docker-compose.yml up -d # detach once stable
+```
+
+This was a deliberate choice: redroid first-boot is heavy (kernel modules + Android init) and has wedged Always Free ARM VMs when run unattended via cloud-init. With manual start you can `Ctrl+C` if the VM gets sick.
 
 ## 7. First-time game install
 

@@ -106,14 +106,24 @@ locals {
 
   cloud_init = <<-CLOUD_INIT
     #!/usr/bin/env bash
-    set -euo pipefail
+    set -euxo pipefail
 
-    # --- Install Docker ---
+    # --- Install Docker from Docker's official APT repo ---
+    # Ubuntu's docker.io package lacks the modern `docker compose` plugin,
+    # and `docker-compose-plugin` only exists in Docker's repo, not Ubuntu's.
     apt-get update
-    apt-get install -y docker.io docker-compose-plugin git
+    apt-get install -y ca-certificates curl gnupg git
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     # --- Kernel modules for redroid ---
-    apt-get install -y linux-modules-extra-$(uname -r)
+    apt-get install -y linux-modules-extra-$(uname -r) || true
     modprobe binder_linux devices="binder,hwbinder,vndbinder" || true
     modprobe ashmem_linux || true
 
@@ -124,21 +134,22 @@ locals {
     # --- Firewall: healthcheck only, NOT ADB ---
     iptables -I INPUT -p tcp --dport 8080 -j ACCEPT || true
 
-    # --- Clone repo ---
+    # --- Clone repo + scaffold .env ---
     sudo -u ubuntu git clone ${var.git_repo_url} /home/ubuntu/rwtd-cloud-bot || true
     cd /home/ubuntu/rwtd-cloud-bot
+    [ -f .env ] || cp .env.example .env
 
-    if [ ! -f .env ]; then
-      cp .env.example .env
-    fi
-
-    # --- Start the stack ---
+    # --- Give ubuntu user docker access ---
     usermod -aG docker ubuntu
-    sudo -u ubuntu docker compose -f docker/docker-compose.yml up -d || true
 
     # --- Keep-alive cron to prevent Oracle from reclaiming the VM ---
     echo "*/30 * * * * /usr/bin/head -c 1M /dev/zero | /usr/bin/md5sum > /dev/null" \
       | crontab -u ubuntu -
+
+    # --- NOTE: We intentionally do NOT auto-start the docker stack. ---
+    # First-boot of redroid + kernel modules has wedged VMs in the past.
+    # SSH in and run `cd ~/rwtd-cloud-bot && docker compose -f docker/docker-compose.yml up -d`
+    # with eyes on the logs. See docs/oracle-setup.md.
   CLOUD_INIT
 }
 
